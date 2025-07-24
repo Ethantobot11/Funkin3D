@@ -14,7 +14,8 @@ local week6 = {
 local song = 1
 local difficulty
 
-local stageback, stagefront, stagecurtains
+local sky, school, street, treesBack
+local trees, petals, freaks
 
 function week6:enter(from, song_, diff)
     song = song_ or 1
@@ -86,7 +87,7 @@ function week6:topDraw()
     love.graphics.push()
         love.graphics.translate(200,120)
         love.graphics.scale(1.4, 1.4)
-        
+
 
         love.graphics.push()
         love.graphics.translate(camera.x*0.9, camera.y*0.9)
@@ -94,7 +95,7 @@ function week6:topDraw()
             if song ~= 3 then sky:draw() end
             school:draw()
         love.graphics.pop()
-        
+
         love.graphics.push()
         love.graphics.translate(camera.x, camera.y)
             love.graphics.scale(camera.zoom*1.45, camera.zoom*1.45)
