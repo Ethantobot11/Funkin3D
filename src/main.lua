@@ -1,174 +1,180 @@
 require "modules.overrides"
-local desktop = {"Windows", "Linux", "OS X"}
-IS_DESKTOP = false
-nest = require("lib.nest").init({ console = "3ds", scale = 1, mode = "720" })
 
+local baton = require "lib.baton"
+Timer = require "lib.timer"
+state = require "lib.state"
+local nest = require("lib.nest").init({ console = "3ds", scale = 1, mode = "720" })
+
+local desktopOS = { "Windows", "Linux", "OS X" }
+IS_DESKTOP = false
 __DEBUG__ = false
 
-function love.load()
-    if love.graphics.setDefaultFilter then
-        love.graphics.setDefaultFilter("nearest", "nearest")
-    end
-    Timer = require "lib.timer"
-    state = require "lib.state"
+input = nil
+audio = {}
+graphics = nil
+isErect = false
+weekData = {}
+spriteTimers = {0, 0, 0}
+weeks = nil
+font, uiFont, uiFont2 = nil, nil, nil
 
-    IS_DESKTOP = table.find(desktop, love.system.getOS())
+camera = { zoom = 1, toZoom = 1, x = 0, y = 0, zooming = true, locked = false }
+uiScale = { zoom = 1, toZoom = 1, x = 0, y = 0 }
 
-    if IS_DESKTOP then
-        -- is desktop (used for testing)
-        input = (require "lib.baton").new {
-            controls = {
-                -- UI
-                uiLeft =        { "axis:leftx-", "button:dpleft",  "key:left"  },
-                uiRight =       { "axis:leftx+", "button:dpright", "key:right" },
-                uiUp =          { "axis:lefty-", "button:dpup",    "key:up"    },
-                uiDown =        { "axis:lefty+", "button:dpdown",  "key:down"  },
-                uiConfirm =     { "button:a",    "key:return"    },
-                uiBack =        { "button:b",    "key:escape"    },
-                uiErectButton = { "button:back", "key:tab"       },
-                
-                -- Gameplay
-                gameLeft =  { "axis:leftx-", "button:dpleft",  "axis:rightx-", "button:x", "axis:triggerleft+",    "key:left",  "key:a"   },
-                gameDown =  { "axis:lefty+", "button:dpdown",  "axis:righty+", "button:y", "button:leftshoulder",  "key:down",  "key:s"   },
-                gameUp =    { "axis:lefty-", "button:dpup",    "axis:righty-", "button:a", "button:rightshoulder", "key:up",    "key:w"   },
-                gameRight = { "axis:leftx+", "button:dpright", "axis:rightx+", "button:b", "axis:triggerright+",   "key:right", "key:d"   },
-            },
-            joystick = love.joystick.getJoysticks()[1],
-        }
-    else
-        -- is 3DS
-        input = (require "lib.baton").new {
-            controls = {
-                -- UI
-                uiLeft =        { "axis:leftx-", "button:dpleft"  },
-                uiRight =       { "axis:leftx+", "button:dpright" },
-                uiUp =          { "axis:lefty-", "button:dpup"    },
-                uiDown =        { "axis:lefty+", "button:dpdown"  },
-                uiConfirm =     { "button:a"    },
-                uiBack =        { "button:b"    },
-                uiErectButton = { "button:back" },
-                
-                -- Gameplay
-                gameLeft =  { "button:leftshoulder",  "axis:leftx-",  "axis:rightx-",       "button:dpleft",  "button:y"   },
-                gameDown =  { "axis:lefty+",          "axis:righty+", "axis:triggerleft+",  "button:dpdown",  "button:b"   },
-                gameUp =    { "axis:lefty-",          "axis:righty-", "axis:triggerright+", "button:dpup",    "button:x"   },
-                gameRight = { "button:rightshoulder", "axis:leftx+",  "axis:rightx+",       "button:dpright", "button:a"   },
-            },
-            joystick = love.joystick.getJoysticks()[1],
-        }
-    end
+love.graphics.setActiveScreen = love.graphics.setActiveScreen or function(s)
+	love._activeScreen = s
+end
 
-    uiConfirm = love.audio.newSource("assets/sounds/confirmMenu.ogg", "static")
-    uiBack = love.audio.newSource("assets/sounds/cancelMenu.ogg", "static")
-    uiScroll = love.audio.newSource("assets/sounds/scrollMenu.ogg", "static")
+love.graphics.getActiveScreen = love.graphics.getActiveScreen or function()
+	return love._activeScreen or "bottom"
+end
 
-    -- Modules
-    graphics = require "modules.graphics"
-    audio = {play = function(sound)
-        sound:stop()
-        sound:play()
-    end}
+local function isDesktop()
+	local os = love.system.getOS()
+	for _, v in ipairs(desktopOS) do
+		if v == os then return true end
+	end
+	return false
+end
 
-    isErect = false
+local function setupInput(desktop)
+	local config = {
+		uiLeft     = { "axis:leftx-", "button:dpleft" },
+		uiRight    = { "axis:leftx+", "button:dpright" },
+		uiUp       = { "axis:lefty-", "button:dpup" },
+		uiDown     = { "axis:lefty+", "button:dpdown" },
+		uiConfirm  = { "button:a" },
+		uiBack     = { "button:b" },
+		uiErectButton = { "button:back" },
 
-    weekData = {
-        require "states.weeks.tutorial",
-        require "states.weeks.week1",
-        require "states.weeks.week2",
-        require "states.weeks.week3",
-        require "states.weeks.week4",
-        require "states.weeks.week5",
-        require "states.weeks.week6"
-    }
-
-    -- States
-    title = require "states.menu.title"
-    title.music = love.audio.newSource("assets/music/freakyMenu.ogg", "stream")
-    title.music:setLooping(true)
-    title.music:setVolume(0.5)
-    title.music:play()
-
-    menuSelect = require "states.menu.menuSelect"
-    storyMode = require "states.menu.storyMode"
-    freeplay = require "states.menu.freeplay"
-
-    debugOffset = require "states.debug.offsets"
-
-    camera = {
-        zoom=1,
-        toZoom=1,
-        x=0,y=0,
-        zooming=true,
-        locked=false
-    }
-
-    uiScale = {
-        zoom=1,
-        toZoom=1,
-        x=0,y=0
-    }
-
-    spriteTimers = {
-		0, -- Girlfriend
-		0, -- Enemy
-		0 -- Boyfriend
+		-- Gameplay
+		gameLeft   = { "axis:leftx-", "axis:rightx-", "button:dpleft",  "button:y" },
+		gameDown   = { "axis:lefty+", "axis:righty+", "axis:triggerleft+",  "button:dpdown", "button:b" },
+		gameUp     = { "axis:lefty-", "axis:righty-", "axis:triggerright+", "button:dpup",   "button:x" },
+		gameRight  = { "axis:leftx+", "axis:rightx+", "button:dpright", "button:a" },
 	}
 
-    weeks = require "states.weeks"
+	if desktop then
+        table.insert(config.uiLeft, "key:left")
+        table.insert(config.uiRight, "key:right")
+        table.insert(config.uiUp, "key:up")
+        table.insert(config.uiDown, "key:down")
+        table.insert(config.uiConfirm, "key:return")
+        table.insert(config.uiBack, "key:escape")
+        table.insert(config.uiErectButton, "key:tab")
 
-    font = love.graphics.newFont("assets/fonts/vcr.ttf", 12)
-    uiFont = love.graphics.newFont("assets/fonts/vcr.ttf", 24)
-    uiFont2 = love.graphics.newFont("assets/fonts/vcr.ttf", 18)
-    love.graphics.setFont(uiFont)
+        table.insert(config.gameLeft, "key:a")
+        table.insert(config.gameLeft, "key:left")
+        table.insert(config.gameDown, "key:s")
+        table.insert(config.gameDown, "key:down")
+        table.insert(config.gameUp, "key:w")
+        table.insert(config.gameUp, "key:up")
+        table.insert(config.gameRight, "key:d")
+        table.insert(config.gameRight, "key:right")
+	end
 
-    state.switch(title)
+	input = baton.new({
+		controls = config,
+		joystick = love.joystick.getJoysticks()[1],
+	})
+end
 
-    graphics.setFade(0)
-    graphics.fadeIn(0.5)
+function love.load()
+	if love.graphics.setDefaultFilter then
+		love.graphics.setDefaultFilter("nearest", "nearest")
+	end
+
+	IS_DESKTOP = isDesktop()
+	setupInput(IS_DESKTOP)
+
+	audio.play = function(sound)
+		sound:stop()
+		sound:play()
+	end
+
+	uiConfirm = love.audio.newSource("assets/sounds/confirmMenu.ogg", "static")
+	uiBack    = love.audio.newSource("assets/sounds/cancelMenu.ogg", "static")
+	uiScroll  = love.audio.newSource("assets/sounds/scrollMenu.ogg", "static")
+
+	-- Load modules
+	graphics = require "modules.graphics"
+
+	-- Load weeks
+	weekData = {
+		require "states.weeks.tutorial",
+		require "states.weeks.week1",
+		require "states.weeks.week2",
+		require "states.weeks.week3",
+		require "states.weeks.week4",
+		require "states.weeks.week5",
+		require "states.weeks.week6"
+	}
+	weeks = require "states.weeks"
+
+	title       = require "states.menu.title"
+	menuSelect  = require "states.menu.menuSelect"
+	storyMode   = require "states.menu.storyMode"
+	freeplay    = require "states.menu.freeplay"
+	debugOffset = require "states.debug.offsets"
+
+	title.music = love.audio.newSource("assets/music/freakyMenu.ogg", "stream")
+	title.music:setLooping(true)
+	title.music:setVolume(0.5)
+	title.music:play()
+
+	font    = love.graphics.newFont("assets/fonts/vcr.ttf", 12)
+	uiFont  = love.graphics.newFont("assets/fonts/vcr.ttf", 24)
+	uiFont2 = love.graphics.newFont("assets/fonts/vcr.ttf", 18)
+	love.graphics.setFont(uiFont)
+
+	state.switch(title)
+
+	graphics.setFade(0)
+	graphics.fadeIn(0.5)
 end
 
 function love.update(dt)
-    local dt = math.min(dt, 1/30)
-    input:update()
-    Timer.update(dt)
-    state.update(dt)
+	dt = math.min(dt, 1 / 30)
+	input:update()
+	Timer.update(dt)
+	state.update(dt)
 end
 
 function love.keypressed(k)
-    if k == "7" then
-        state.switch(debugOffset)
-    end
-    state.keypressed(k)
-    nest.video.keypressed(k)
+	if k == "7" then
+		state.switch(debugOffset)
+	end
+	state.keypressed(k)
+	nest.video.keypressed(k)
 end
 
 function love.draw(screen)
-    love.graphics.push()
-    if love._console and love._console == "Wii U" then
-        if screen == "gamepad" then
-            love.graphics.scale(2, 2)
-            love.graphics.translate(60, 0)
-        else
-            love.graphics.scale(3, 3)
-            love.graphics.translate(12, 0)
-        end
-    end
-    graphics.setColor(1,1,1,1)
+	graphics.setActiveScreen(screen)
+	love.graphics.push()
 
-    if screen == "bottom" or screen == "gamepad" then
-        state.bottomDraw()
+	if love._console == "Wii U" then
+		if screen == "gamepad" then
+			love.graphics.scale(2, 2)
+			love.graphics.translate(60, 0)
+		else
+			love.graphics.scale(3, 3)
+			love.graphics.translate(12, 0)
+		end
+	end
 
-        -- draw debug stuff
-        love.graphics.print(
-            "FPS: " .. love.timer.getFPS() .. "\n" ..
-            "Memory: " .. math.round(collectgarbage("count"), 2) .. "KB\n",
-            0, 190
-        )
-    else
-        state.topDraw()
-    end
+	graphics.setColor(1, 1, 1, 1)
 
-    love.graphics.pop()
-    
-    love.graphics.setColor(1,1,1,1)
+	if screen == "bottom" or screen == "gamepad" then
+		state.bottomDraw()
+
+		love.graphics.print(
+			("FPS: %d\nMemory: %.2fKB"):format(love.timer.getFPS(), collectgarbage("count")),
+			0, 190
+		)
+	else
+		state.topDraw()
+	end
+
+	love.graphics.pop()
+	love.graphics.setColor(1, 1, 1, 1)
 end
