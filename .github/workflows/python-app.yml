@@ -5,32 +5,39 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitarm  # <-- use devkitPro Docker image
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      
 
     # Install devkitARM & 3DS libraries
-    - name: Install devkitPro
+    # Install Haxe3DS + reflaxe
+    - name: Install Haxe3DS
       run: |
-        sudo mkdir -p /etc/pacman.d
-        sudo tee /etc/pacman.d/mirrorlist <<EOF
-        Server = https://downloads.devkitpro.org/packages
-        EOF
-        sudo tee /etc/pacman.conf <<EOF
-        [dkp-libs]
-        Server = https://downloads.devkitpro.org/packages
-        SigLevel = Never
-        [dkp]
-        Server = https://downloads.devkitpro.org/packages
-        SigLevel = Never
-        EOF
-        sudo pacman -Sy --noconfirm
-        sudo pacman -S --noconfirm devkitARM 3ds-dev
+          haxelib git haxe3ds https://github.com/NAEL2XD/Haxe3DS.git
+          haxelib install reflaxe
 
-    # Build the project (example LovePotion build)
-    - name: Build 3dsx
+      # Compile using build3ds.hxml
+    - name: Compile for 3DS
       run: |
-        export DEVKITPRO=/opt/devkitpro
-        export DEVKITARM=/opt/devkitpro/devkitARM
-        make
+          haxe build3ds.hxml
+
+    - name: Build CIA package
+      run: |
+          # Example assumes your .3dsx is at build/cpp/bin/app.3dsx
+          # Convert .3dsx -> .cia using bannertool + makerom
+          bannertool makebanner -i icon.png -a audio.wav -o banner.bnr
+          bannertool makesmdh -s "Psych Engine" -l "Psych Engine (3DS)" -p "Psych" -i icon.png -o icon.icn
+          makerom -f cia -o PsychEngine.cia -elf build/cpp/bin/app.elf \
+            -icon icon.icn -banner banner.bnr \
+            -rsf build/cia/cia.rsf \
+            -exefslogo
+
+    - name: Upload 3DS Build
+      uses: actions/upload-artifact@main
+      with:
+          name: cia Build
+          path: build/cpp/bin/*.cia
