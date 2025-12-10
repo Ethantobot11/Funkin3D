@@ -1,0 +1,16 @@
+# Classpath
+-cp source
+
+# Main class
+-main Main
+
+# Haxe3DS libs
+-lib haxe3ds
+-lib reflaxe
+
+# Target flags
+-D 3ds
+-D HXCPP_M32
+
+# Output folder
+--cpp build/cpp
