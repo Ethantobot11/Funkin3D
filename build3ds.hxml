@@ -1,12 +1,8 @@
 # Classpath
--cp source
+-cp src
 
 # Main class
--main Main
-
-# Haxe3DS libs
--lib haxe3ds
--lib reflaxe
+-src main
 
 # Target flags
 -D 3ds
