@@ -1,10 +1,12 @@
-import os, sys
+import os
+import sys
 import xml.etree.ElementTree as ET
 
 def main():
     file = sys.argv[1]
     
-    filename, file_extension = os.path.splitext(file)
+    filename = os.path.splitext(file)
+    file_extension = os.path.splitext(file)
     
     # create xml tree
     root = ET.Element("TextureAtlas")
@@ -35,4 +37,4 @@ def main():
     tree.write(filename + ".xml", encoding="utf-8", xml_declaration=True, method="xml", default_namespace=None, short_empty_elements=True)
     
 if __name__ == "__main__":
-    main()
+    main();
